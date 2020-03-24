@@ -44,12 +44,6 @@ func main() {
 			return
 		}
 
-		md5hash := query.Get("md5hash")
-		if md5hash == "" {
-			http.Error(w, "`md5hash` is a required parameter", http.StatusBadRequest)
-			return
-		}
-
 		object := query.Get("object")
 		if object == "" {
 			http.Error(w, "`object` is a required parameter", http.StatusBadRequest)
@@ -60,7 +54,6 @@ func main() {
 			ContentType:    contentType,
 			Expires:        time.Now().Add(15 * time.Minute),
 			GoogleAccessID: conf.Email,
-			MD5:            md5hash,
 			Method:         method,
 			PrivateKey:     conf.PrivateKey,
 		}
