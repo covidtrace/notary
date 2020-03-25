@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -24,6 +25,16 @@ func main() {
 		panic(errors.New("GOOGLE_SERVICE_ACCOUNT environment variable is required"))
 	}
 
+	bucketList := os.Getenv("STORAGE_BUCKETS")
+	if bucketList == "" {
+		panic(errors.New("STORAGE_BUCKETS environment variable is required"))
+	}
+
+	buckets := strings.Split(bucketList, ",")
+	if len(buckets) == 0 {
+		panic(errors.New("No buckets configured"))
+	}
+
 	router.POST("/", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		conf, err := google.JWTConfigFromJSON([]byte(serviceAccount))
 		if err != nil {
@@ -36,6 +47,25 @@ func main() {
 		method := query.Get("method")
 		if method == "" {
 			method = "PUT"
+		}
+
+		bucket := query.Get("bucket")
+		if bucket == "" {
+			bucket = buckets[0]
+		} else {
+			found := false
+			for _, candidate := range buckets {
+				if strings.EqualFold(candidate, bucket) {
+					bucket = candidate
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				http.Error(w, "Bucket not allowed", http.StatusBadRequest)
+				return
+			}
 		}
 
 		contentType := query.Get("contentType")
@@ -58,7 +88,7 @@ func main() {
 			PrivateKey:     conf.PrivateKey,
 		}
 
-		signedURL, err := storage.SignedURL("covidtrace-holding", object, opts)
+		signedURL, err := storage.SignedURL(bucket, object, opts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
