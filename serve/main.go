@@ -44,11 +44,6 @@ func main() {
 
 		query := r.URL.Query()
 
-		method := query.Get("method")
-		if method == "" {
-			method = "PUT"
-		}
-
 		bucket := query.Get("bucket")
 		if bucket == "" {
 			bucket = buckets[0]
@@ -84,7 +79,7 @@ func main() {
 			ContentType:    contentType,
 			Expires:        time.Now().Add(15 * time.Minute),
 			GoogleAccessID: conf.Email,
-			Method:         method,
+			Method:         "PUT",
 			PrivateKey:     conf.PrivateKey,
 		}
 
