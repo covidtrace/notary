@@ -25,7 +25,7 @@ func main() {
 		panic(errors.New("GOOGLE_SERVICE_ACCOUNT environment variable is required"))
 	}
 
-	bucketList := os.Getenv("STORAGE_BUCKETS")
+	bucketList := os.Getenv("CLOUD_STORAGE_BUCKETS")
 	if bucketList == "" {
 		panic(errors.New("STORAGE_BUCKETS environment variable is required"))
 	}
