@@ -5,7 +5,7 @@ Trace app can upload files directly to Cloud Storage.
 
 ## API
 
-### POST /
+### `POST /`
 
 ```
 curl -XPOST 'https://covidtrace-notary.domain/?contentType=text/csv&object=sample.csv&bucket=BUCKET'
