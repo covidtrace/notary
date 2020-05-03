@@ -1,18 +1,16 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/covidtrace/utils/env"
+	httputils "github.com/covidtrace/utils/http"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/oauth2/google"
 )
@@ -20,15 +18,8 @@ import (
 func main() {
 	router := httprouter.New()
 
-	serviceAccount := os.Getenv("GOOGLE_SERVICE_ACCOUNT")
-	if serviceAccount == "" {
-		panic(errors.New("GOOGLE_SERVICE_ACCOUNT environment variable is required"))
-	}
-
-	bucketList := os.Getenv("CLOUD_STORAGE_BUCKETS")
-	if bucketList == "" {
-		panic(errors.New("STORAGE_BUCKETS environment variable is required"))
-	}
+	serviceAccount := env.MustGet("GOOGLE_SERVICE_ACCOUNT")
+	bucketList := env.MustGet("CLOUD_STORAGE_BUCKETS")
 
 	buckets := strings.Split(bucketList, ",")
 	if len(buckets) == 0 {
@@ -38,7 +29,7 @@ func main() {
 	router.POST("/", func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		conf, err := google.JWTConfigFromJSON([]byte(serviceAccount))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httputils.ReplyInternalServerError(w, err)
 			return
 		}
 
@@ -58,20 +49,20 @@ func main() {
 			}
 
 			if !found {
-				http.Error(w, "Bucket not allowed", http.StatusBadRequest)
+				httputils.ReplyBadRequestError(w, errors.New("Bucket not allowed"))
 				return
 			}
 		}
 
 		contentType := query.Get("contentType")
 		if contentType == "" {
-			http.Error(w, "`contentType` is a required parameter", http.StatusBadRequest)
+			httputils.ReplyBadRequestError(w, errors.New("`contentType` is a required parameter"))
 			return
 		}
 
 		object := query.Get("object")
 		if object == "" {
-			http.Error(w, "`object` is a required parameter", http.StatusBadRequest)
+			httputils.ReplyBadRequestError(w, errors.New("`object` is a required parameter"))
 			return
 		}
 
@@ -85,35 +76,22 @@ func main() {
 
 		signedURL, err := storage.SignedURL(bucket, object, opts)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httputils.ReplyBadRequestError(w, err)
 			return
 		}
 
-		m := struct {
+		httputils.ReplyJSON(w, struct {
 			Status    string `json:"status"`
 			SignedURL string `json:"signed_url"`
 		}{
 			Status:    "success",
 			SignedURL: signedURL,
-		}
-
-		b, err := json.Marshal(m)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		io.Copy(w, bytes.NewReader(b))
+		}, http.StatusOK)
 	})
 
 	router.PanicHandler = func(w http.ResponseWriter, _ *http.Request, _ interface{}) {
-		http.Error(w, "Unknown error", http.StatusBadRequest)
+		httputils.ReplyInternalServerError(w, errors.New("Unknown error"))
 	}
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), router))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", env.GetDefault("PORT", "8080")), router))
 }
